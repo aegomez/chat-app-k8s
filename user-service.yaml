@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-db
+  labels:
+    run: user-db
+    tier: backend
+spec:
+  ports:
+    - port: 27017
+      targetPort: 27017
+  selector:
+    run: user-db
+    tier: backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-db
+spec:
+  selector:
+    matchLabels:
+      run: user-db
+      tier: backend
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        run: user-db
+        tier: backend
+    spec:
+      containers:
+        - name: user-db
+          image: mongo:4.2-bionic
+          envFrom:
+            - secretRef:
+                name: user-db-secret
+          ports:
+            - containerPort: 27017
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  labels:
+    run: user-service
+    tier: backend
+spec:
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    run: user-service
+    tier: backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+spec:
+  selector:
+    matchLabels:
+      run: user-service
+      tier: backend
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        run: user-service
+        tier: backend
+    spec:
+      containers:
+        - name: user-service
+          image: aegomez/chat-users:0.9.1
+          env:
+            - name: AUTH_API_URI
+              value: http://auth-service:2000/q
+            - name: CHAT_API_URI
+              value: http://conv-service:4000/api
+            - name: NODE_ENV
+              value: production
+            - name: MONGODB_URI
+              value: mongodb://user-db:27017/Profiles
+            - name: MONGODB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: user-db-secret
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MONGODB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: user-db-secret
+                  key: MONGO_INITDB_ROOT_PASSWORD
+            - name: CLOUDINARY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: user-service-secret
+                  key: CLOUDINARY_URL
+          ports:
+            - containerPort: 3000
+  
